@@ -385,7 +385,7 @@ class RegistrationForm {
             // Add FormSubmit parameters
             const params = {
                 '_subject': 'New Registration - Spark & Scale',
-                '_next': 'https://yourwebsite.com/success.html',
+                '_next': ' https://song6297.github.io/AL-MAJEED-store/',
                 '_captcha': 'false',
                 '_template': 'table'
             };
