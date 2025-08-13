@@ -8,6 +8,7 @@ class RegistrationForm {
         this.initializeElements();
         this.attachEventListeners();
         this.updateProgress();
+        this.showPage(this.currentPage);
     }
     
     initializeElements() {
@@ -19,6 +20,7 @@ class RegistrationForm {
         this.currentPageSpan = document.getElementById('currentPage');
         this.topicsCount = document.getElementById('topicsCount');
         this.successPage = document.getElementById('successPage');
+        this.formNavigation = document.querySelector('.form-navigation');
         
         this.pages = [
             document.getElementById('page1'),
@@ -40,9 +42,10 @@ class RegistrationForm {
             this.prevPage();
         });
         
-        this.submitBtn.addEventListener('click', (e) => {
+        // This listener is now crucial for final form submission
+        this.form.addEventListener('submit', (e) => {
             e.preventDefault();
-            this.submitForm(e);
+            this.submitForm();
         });
         
         // Topics counter
@@ -51,15 +54,13 @@ class RegistrationForm {
             checkbox.addEventListener('change', () => this.updateTopicsCounter());
         });
         
-        // Clear errors on input (but don't interfere with normal input behavior)
+        // Clear errors on input/change
         this.form.addEventListener('input', (e) => {
-            // Only clear error, don't manipulate focus
-            setTimeout(() => this.clearError(e.target), 10);
+            this.clearError(e.target);
         });
         
         this.form.addEventListener('change', (e) => {
-            // Only clear error, don't manipulate focus
-            setTimeout(() => this.clearError(e.target), 10);
+            this.clearError(e.target);
         });
         
         // Prevent form submission on Enter in text fields (except textarea)
@@ -80,11 +81,14 @@ class RegistrationForm {
         // Hide all pages
         this.pages.forEach(page => {
             page.classList.remove('active');
+            page.style.display = 'none';
         });
         
         // Show current page
-        if (this.pages[pageNumber - 1]) {
-            this.pages[pageNumber - 1].classList.add('active');
+        const currentPageElement = this.pages[pageNumber - 1];
+        if (currentPageElement) {
+            currentPageElement.classList.add('active');
+            currentPageElement.style.display = 'block';
         }
         
         // Update navigation buttons
@@ -113,22 +117,21 @@ class RegistrationForm {
     }
     
     validateCurrentPage() {
-        let isValid = true;
-        
         // Clear previous errors first
         this.clearAllErrors();
         
-        if (this.currentPage === 1) {
-            isValid = this.validatePage1();
-        } else if (this.currentPage === 2) {
-            isValid = this.validatePage2();
-        } else if (this.currentPage === 3) {
-            isValid = this.validatePage3();
-        } else if (this.currentPage === 4) {
-            isValid = this.validatePage4();
+        switch (this.currentPage) {
+            case 1:
+                return this.validatePage1();
+            case 2:
+                return this.validatePage2();
+            case 3:
+                return this.validatePage3();
+            case 4:
+                return this.validatePage4();
+            default:
+                return false;
         }
-        
-        return isValid;
     }
     
     validatePage1() {
@@ -231,14 +234,13 @@ class RegistrationForm {
         const errorElement = document.getElementById(`${fieldName}-error`);
         if (errorElement) {
             errorElement.textContent = message;
-            errorElement.classList.add('show');
+            errorElement.style.display = 'block'; // Ensure error message is visible
             
             // Add error styling to field
             const field = document.getElementById(fieldName);
             if (field) {
                 field.style.borderColor = 'var(--color-error)';
             } else {
-                // For radio/checkbox groups
                 const radioField = document.querySelector(`input[name="${fieldName}"]`);
                 if (radioField) {
                     const container = radioField.closest('.radio-group') || radioField.closest('.checkbox-group');
@@ -256,7 +258,8 @@ class RegistrationForm {
         const fieldName = field.name || field.id;
         const errorElement = document.getElementById(`${fieldName}-error`);
         if (errorElement) {
-            errorElement.classList.remove('show');
+            errorElement.textContent = ''; // Clear the error message text
+            errorElement.style.display = 'none'; // Hide the error message
         }
         
         // Remove error styling
@@ -272,9 +275,11 @@ class RegistrationForm {
     
     clearAllErrors() {
         const errorElements = document.querySelectorAll('.error-message');
-        errorElements.forEach(error => error.classList.remove('show'));
+        errorElements.forEach(error => {
+            error.textContent = '';
+            error.style.display = 'none';
+        });
         
-        // Clear field styling
         const fields = document.querySelectorAll('.form-control');
         fields.forEach(field => {
             field.style.borderColor = '';
@@ -305,29 +310,34 @@ class RegistrationForm {
             }
         });
         
-        // Clear topics error if exactly 3 selected
+        // Clear topics error if exactly 3 are selected
         if (selectedTopics.length === 3) {
             const topicsError = document.getElementById('topics-error');
             if (topicsError) {
-                topicsError.classList.remove('show');
+                topicsError.textContent = '';
+                topicsError.style.display = 'none';
             }
         }
     }
     
     saveCurrentPageData() {
+        // Collect data from current page and store it in this.formData
         const currentPageElement = this.pages[this.currentPage - 1];
         if (!currentPageElement) return;
-        
-        const inputs = currentPageElement.querySelectorAll('input, textarea, select');
-        
+
+        const inputs = currentPageElement.querySelectorAll('input, textarea');
+
         inputs.forEach(input => {
             if (input.type === 'checkbox') {
                 if (!this.formData[input.name]) {
                     this.formData[input.name] = [];
                 }
-                if (input.checked && !this.formData[input.name].includes(input.value)) {
-                    this.formData[input.name].push(input.value);
-                } else if (!input.checked) {
+                if (input.checked) {
+                    if (!this.formData[input.name].includes(input.value)) {
+                        this.formData[input.name].push(input.value);
+                    }
+                } else {
+                     // Remove from array if unchecked.
                     const index = this.formData[input.name].indexOf(input.value);
                     if (index > -1) {
                         this.formData[input.name].splice(index, 1);
@@ -342,90 +352,42 @@ class RegistrationForm {
             }
         });
     }
-    
-    async submitForm(e) {
-        e.preventDefault();
-        
-        if (!this.validateCurrentPage()) {
-            return;
-        }
-        
-        // Save final page data
-        this.saveCurrentPageData();
-        
-        // Show loading state
-        this.submitBtn.classList.add('loading');
-        this.submitBtn.disabled = true;
-        
-        try {
-            // Create a hidden form for submission
-            const form = document.createElement('form');
-            form.method = 'POST';
-            form.action = 'https://formsubmit.co/sulaimaansong6297@gmail.com';
+
+    // New method to handle the final submission
+    submitForm() {
+        if (this.validateCurrentPage()) {
+            this.saveCurrentPageData(); // Save the final page's data
             
-            // Add all form data as hidden inputs
-            for (const [key, value] of Object.entries(this.formData)) {
-                if (Array.isArray(value)) {
-                    value.forEach(val => {
-                        const input = document.createElement('input');
-                        input.type = 'hidden';
-                        input.name = `${key}[]`;
-                        input.value = val;
-                        form.appendChild(input);
-                    });
+            const formData = new FormData(this.form);
+            const url = this.form.action;
+
+            fetch(url, {
+                method: 'POST',
+                body: formData,
+            })
+            .then(response => {
+                if (response.ok) {
+                    this.showSuccessPage();
                 } else {
-                    const input = document.createElement('input');
-                    input.type = 'hidden';
-                    input.name = key;
-                    input.value = value;
-                    form.appendChild(input);
+                    console.error('Form submission failed');
+                    // You can add an error message to display to the user
                 }
-            }
-            
-            // Add FormSubmit parameters
-            const params = {
-                '_subject': 'New Registration - Spark & Scale',
-                '_next': ' https://song6297.github.io/AL-MAJEED-store/',
-                '_captcha': 'false',
-                '_template': 'table'
-            };
-            
-            for (const [key, value] of Object.entries(params)) {
-                const input = document.createElement('input');
-                input.type = 'hidden';
-                input.name = key;
-                input.value = value;
-                form.appendChild(input);
-            }
-            
-            // Add the form to the page and submit it
-            document.body.appendChild(form);
-            form.submit();
-            
-        } catch (error) {
-            console.error('Error:', error);
-            // Show error message to user
-            alert('There was an error submitting the form. Please try again.');
-            this.submitBtn.classList.remove('loading');
-            this.submitBtn.disabled = false;
+            })
+            .catch(error => {
+                console.error('Network error during form submission:', error);
+                // You can add an error message to display to the user
+            });
         }
     }
     
     showSuccessPage() {
-        // Hide form and show success page
         this.form.style.display = 'none';
         this.successPage.classList.remove('hidden');
-        
-        // Hide progress bar
+        this.formNavigation.style.display = 'none';
         const progressContainer = document.querySelector('.progress-container');
         if (progressContainer) {
             progressContainer.style.display = 'none';
         }
-        
-        // Log form data (in real app, this would be sent to server)
-        console.log('Form submitted successfully:', this.formData);
-        
-        // Scroll to top
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 }
